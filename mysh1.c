@@ -7,18 +7,26 @@
 
 int main(int argc, char const *argv[]) {
   char const *name = argv[1];
-  char input[100];
+  char prog[100], var[100];
+  char *cwd;
+  char *buf;
 
   while (1) {
-    scanf("%s", input);
-    if (strcmp(input,"exit")==0) {
+    scanf("%s", prog);
+    if (strcmp(prog,"exit")==0) {
       exit(1);
-    } else if (strcmp(input,"cd")==0) {
-      printf("probably cd\n");
+    } else if (strcmp(prog,"cd")==0) {
       // fork and make the child change directory
+      if (fork()==0) {
+        cwd = getcwd(buf, 100);
+        printf("%s\n", cwd);
+      } else {
+        wait(NULL);
+        printf("$ ");
+      }
     } else {
       if (fork()==0) {
-        execlp(input, input, NULL);
+        execlp(prog, prog, NULL);
         perror("Error calling exec()! \n");
         exit(1);
       } else {
