@@ -5,6 +5,7 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 
+
 int main()
 {
   int i;
@@ -22,13 +23,15 @@ int main()
     }
     wait(NULL);
   } else {
-    sleep(1);
+    // sleep(2);
+    semop(my_sem, &up, 1);
     for (size_t i = 0; i < 10; i++) {
-      semop(my_sem, &up, 1);
-      display("Bonjour monde\n");
       semop(my_sem, &down, 1);
+      display("Bonjour monde\n");
+      semop(my_sem, &up, 1);
     }
   }
 
+  semctl(my_sem, 0, IPC_RMID);
   return 0;
 }
