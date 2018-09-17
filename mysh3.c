@@ -14,6 +14,8 @@ int main(int argc, char const *argv[]) {
     fprintf(stdout, "$ ");
     if (fgets(prog, sizeof(prog), stdin) != NULL) {
       i = 0;
+      arg1[1] = ".";
+      arg2[0] = '\0';
       prog[strcspn(prog, "\n")] = 0;
       p = strtok(prog, "|");
       q = strtok(NULL, "\n");
@@ -43,26 +45,31 @@ int main(int argc, char const *argv[]) {
     } else {
       pipe(pfd);
       if (fork()==0) {
-        dup2(pfd[1], 1);
-        close(pfd[0]);
-        close(pfd[1]);
+        if (arg2[0] != NULL) {
+          dup2(pfd[1], 1);
+          close(pfd[0]);
+          close(pfd[1]);
+        }
         execvp(arg1[0], arg1);
         perror("Error calling exec()! \n");
         exit(1);
       } else {
-        if (fork()==0) {
-          dup2(pfd[0], 0);
-          close(pfd[0]);
-          close(pfd[1]);
-          execvp(arg2[0], arg2);
-          perror("Error calling exec()! \n");
-          exit(1);
+        if (arg2[0] != NULL) {
+          if (fork()==0) {
+            dup2(pfd[0], 0);
+            close(pfd[0]);
+            close(pfd[1]);
+            execvp(arg2[0], arg2);
+            perror("Error calling exec()! \n");
+            exit(1);
+          }
         }
       }
       close(pfd[0]);
       close(pfd[1]);
       wait(NULL);
     }
+    sleep(1);
   }
   return 0;
 }
