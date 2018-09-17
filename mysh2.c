@@ -14,6 +14,7 @@ int main(int argc, char const *argv[]) {
     fprintf(stdout, "$ ");
     if (fgets(prog, sizeof(prog), stdin) != NULL) {
       i = 0;
+      arg[1] = ".";
       prog[strcspn(prog, "\n")] = 0;
       p = strtok(prog, " ");
       while (p != NULL) {
