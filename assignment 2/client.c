@@ -13,23 +13,15 @@ int PUT = 112;
 int FOUND = 102;
 int NOTFOUND = 110;
 
-int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen);
-
 int main(int argc, char *argv[]) {
   char const *hostname = argv[1], *port = argv[2];
   struct addrinfo hints, *result, *p;
   int fd, status;
-  char msg[256];
+  char msg[3][256], *key, *value;
 
-  printf("%i\n", argc);
-  printf("%s\n", hostname);
-  printf("%s\n", port);
-  if (strcmp(argv[4],"put") == 0) {
-    msg = PUT + argv[5] + argv[6];
-  } else if (strcmp(argv[4],"get") == 0) {
-    msg = GET;
-  }
-  printf("%s\n", msg);
+  // printf("%i\n", argc);
+  // printf("%s\n", hostname);
+  // printf("%s\n", port);
 
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
@@ -51,6 +43,33 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "connect error\n");
       exit(EXIT_FAILURE);
     }
+    for (size_t i = 0; i < argc; i++) {
+      if (i < 2) {
+      } else {
+        if (strcmp(argv[i],"put") == 0) {
+          printf("put\n");
+          memset(msg, PUT, 1);
+          key = argv[i+1];
+          value = argv[i+2];
+          strcpy(msg[1], key);
+          strcpy(msg[2], value);
+          if (write(fd, msg, sizeof(msg)) < 0) {
+            fprintf(stderr, "write error\n");
+          }
+          i = i+2;
+        } else if (strcmp(argv[i],"get") == 0) {
+          printf("get\n");
+          memset(msg, GET, 1);
+          key = argv[i+1];
+          strcpy(msg[1], key);
+          if (write(fd, msg, sizeof(msg)) < 0) {
+            fprintf(stderr, "write error\n");
+          }
+          i++;
+        }
+      }
+    }
+
 
   }
 

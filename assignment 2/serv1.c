@@ -18,10 +18,10 @@ int BACKLOG = 5;
 
 
 int main(int argc, char const *argv[]) {
-  int fd, newsock, res;
+  int fd, newsock, res, option=1;
   struct sockaddr_in addr, client_addr;
   socklen_t addrlen;
-  char buf[100];
+  char msg[3][256], *p;
   socklen_t fromlen = sizeof(client_addr);
 
   fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -36,6 +36,11 @@ int main(int argc, char const *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*) &option, sizeof(option)) < 0) {
+    fprintf(stderr, "setsockopt failed\n");
+    exit(EXIT_FAILURE);
+  }
+
   printf("host: %s\n", inet_ntoa(addr.sin_addr));
 
   res = listen(fd, BACKLOG);
@@ -43,9 +48,21 @@ int main(int argc, char const *argv[]) {
     newsock = accept(fd, (struct sockaddr *) &client_addr, &addrlen);
 
     if (newsock < 0) {
-      /* code */
+      fprintf(stderr, "accept error\n");
+      exit(EXIT_FAILURE);
     } else {
       printf("Connection from %s\n", inet_ntoa(client_addr.sin_addr));
+      printf("message: ");
+      if (read(newsock, msg, sizeof(msg)) < 0) {
+        fprintf(stderr, "read error\n");
+        exit(EXIT_FAILURE);
+      }
+      if (strcmp(msg[0], "p") == 0) {
+        printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
+      } else if (strcmp(msg[0], "g") == 0) {
+        printf("get\nkey: %s\n", msg[1]);
+      }
+
     }
     close(newsock);
   }
