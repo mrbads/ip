@@ -9,6 +9,9 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <search.h>
+
+#include "keyvalue.h"
 
 int GET = 103;
 int PUT = 112;
@@ -21,7 +24,7 @@ int main(int argc, char const *argv[]) {
   int fd, newsock, res, option=1;
   struct sockaddr_in addr, client_addr;
   socklen_t addrlen;
-  char msg[3][256], *p;
+  char msg[3][256], *p, *answer, terug[256];
   socklen_t fromlen = sizeof(client_addr);
 
   fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -41,6 +44,11 @@ int main(int argc, char const *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  if (hcreate(64) == 0) {
+    fprintf(stderr, "hcreate error\n");
+    exit(EXIT_FAILURE);
+  }
+
   printf("host: %s\n", inet_ntoa(addr.sin_addr));
 
   res = listen(fd, BACKLOG);
@@ -57,10 +65,21 @@ int main(int argc, char const *argv[]) {
         fprintf(stderr, "read error\n");
         exit(EXIT_FAILURE);
       }
-      if (strcmp(msg[0], "p") == 0) {
+      if (strcmp(msg[0],"p") == 0) {
         printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
+        put(msg[1], msg[2]);
       } else if (strcmp(msg[0], "g") == 0) {
         printf("get\nkey: %s\n", msg[1]);
+        answer = get(msg[1]);
+        if ((strcmp(answer, "NULL")) != 0) {
+          printf("%s\n", answer);
+          memset(terug, FOUND, 1);
+          strcat(terug, answer);
+          printf("%s\n", terug);
+        } else {
+          memset(terug, NOTFOUND, 1);
+          printf("%s\n", terug);
+        }
       }
 
     }
