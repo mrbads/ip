@@ -10,6 +10,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <search.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
 #include "keyvalue.h"
 
@@ -19,17 +21,20 @@ int FOUND = 102;
 int NOTFOUND = 110;
 int BACKLOG = 5;
 
-void recv_requests(int fd) {
+void recv_requests(int fd, int my_sem) {
   // iterative server
 
-  int newsock, res;
+  int newsock;
   struct sockaddr_in client_addr;
   socklen_t addrlen;
   char msg[3][256], terug[256], *answer;
+  struct sembuf up = {0, 1, 0};
+  struct sembuf down = {0, -1, 0};
 
-  res = listen(fd, BACKLOG);
   while (1) {
+    semop(my_sem, &up, 1);
     newsock = accept(fd, (struct sockaddr *) &client_addr, &addrlen);
+    semop(my_sem, &down, 1);
 
     if (newsock < 0) {
       fprintf(stderr, "accept error\n");
@@ -71,12 +76,13 @@ void recv_requests(int fd) {
 }
 
 int main(int argc, char const *argv[]) {
-  int fd, option=1, port, NB_PROC;
+  int fd, option=1, port, NB_PROC, my_sem;
   struct sockaddr_in addr, client_addr;
   socklen_t addrlen;
   char msg[3][256], *p, *answer, terug[256];
   socklen_t fromlen = sizeof(client_addr);
 
+  my_sem = semget(IPC_PRIVATE, 1, 0600);
   port = strtol(argv[1], NULL, 10);
   NB_PROC = strtol(argv[2], NULL, 10);
   fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -96,19 +102,19 @@ int main(int argc, char const *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  if (hcreate(64) == 0) {
-    fprintf(stderr, "hcreate error\n");
-    exit(EXIT_FAILURE);
-  }
+  create(64);
 
   printf("host: %s\n", inet_ntoa(addr.sin_addr));
 
-  for (size_t i = 0; i < NB_PROC; i++) {
-    if (fork() == 0) {
-      recv_requests(fd);
+  listen(fd, BACKLOG);
+
+  while (1) {
+    for (size_t i = 0; i < NB_PROC; i++) {
+      if (fork() == 0) {
+        recv_requests(fd, my_sem);
+      }
     }
   }
 
-  close(fd);
   return 0;
 }

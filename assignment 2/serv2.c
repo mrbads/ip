@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <search.h>
+#include <wait.h>
 
 #include "keyvalue.h"
 
@@ -26,13 +27,12 @@ void sig_chld() {
 }
 
 int main(int argc, char const *argv[]) {
-  int fd, newsock, res, option=1, port;
+  int fd, newsock, res, option=1, port, my_sem;
   struct sockaddr_in addr, client_addr;
   socklen_t addrlen;
-  char msg[3][256], *p, *answer, terug[256];
+  char msg[3][256], *p, *answer, terug[256], req_p[1], req_g[1];
   socklen_t fromlen = sizeof(client_addr);
   pid_t pid;
-  struct hsearch_data *hashtable;
 
   port = strtol(argv[1], NULL, 10);
   fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -52,14 +52,11 @@ int main(int argc, char const *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  if (hcreate_r(64, hashtable) == 0) {
-    fprintf(stderr, "hcreate error\n");
-    exit(EXIT_FAILURE);
-  }
+  create(64);
 
   printf("host: %s\n", inet_ntoa(addr.sin_addr));
 
-  res = listen(fd, BACKLOG);
+  listen(fd, BACKLOG);
   signal(SIGCHLD, sig_chld);
   while (1) {
     newsock = accept(fd, (struct sockaddr *) &client_addr, &addrlen);
@@ -76,10 +73,12 @@ int main(int argc, char const *argv[]) {
           fprintf(stderr, "read error\n");
           exit(EXIT_FAILURE);
         }
-        if (strcmp(msg[0],"p") == 0) {
+        memset(req_p, PUT, 1);
+        memset(req_g, GET, 1);
+        if (memcmp(msg[0], req_p, 1) == 0) {
           printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
           put(msg[1], msg[2]);
-        } else if (strcmp(msg[0], "g") == 0) {
+        } else if (memcmp(msg[0], req_g, 1) == 0) {
           printf("get\nkey: %s\n", msg[1]);
           answer = get(msg[1]);
           if ((strcmp(answer, "NULL")) != 0) {
@@ -99,7 +98,11 @@ int main(int argc, char const *argv[]) {
           }
           memset(terug, 0, sizeof(terug));
         }
+        printf("child done\n");
       } else {
+        sleep(1);
+        answer = get(msg[1]);
+        printf("%s\n", answer);
         close(newsock);
       }
     }

@@ -9,7 +9,6 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#define _GNU_SOURCE
 #include <search.h>
 
 #include "keyvalue.h"
@@ -25,7 +24,7 @@ int main(int argc, char const *argv[]) {
   int fd, newsock, res, option=1, port;
   struct sockaddr_in addr, client_addr;
   socklen_t addrlen;
-  char msg[3][256], *p, *answer, terug[256];
+  char msg[3][256], *p, *answer, terug[256], req_p[1], req_g[1];
   socklen_t fromlen = sizeof(client_addr);
   struct hsearch_data *hashtable;
 
@@ -54,7 +53,6 @@ int main(int argc, char const *argv[]) {
   res = listen(fd, BACKLOG);
   while (1) {
     newsock = accept(fd, (struct sockaddr *) &client_addr, &addrlen);
-
     if (newsock < 0) {
       fprintf(stderr, "accept error\n");
       exit(EXIT_FAILURE);
@@ -65,10 +63,12 @@ int main(int argc, char const *argv[]) {
         fprintf(stderr, "read error\n");
         exit(EXIT_FAILURE);
       }
-      if (strcmp(msg[0],"p") == 0) {
+      memset(req_p, PUT, 1);
+      memset(req_g, GET, 1);
+      if (memcmp(msg[0], req_p, 1) == 0) {
         printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
         put(msg[1], msg[2]);
-      } else if (strcmp(msg[0], "g") == 0) {
+      } else if (memcmp(msg[0], req_g, 1) == 0) {
         printf("get\nkey: %s\n", msg[1]);
         answer = get(msg[1]);
         if ((strcmp(answer, "NULL")) != 0) {

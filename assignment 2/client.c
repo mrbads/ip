@@ -131,19 +131,21 @@ int main(int argc, char *argv[]) {
           value = argv[i+2];
           strcpy(msg[1], key);
           strcpy(msg[2], value);
-          if (write(fd, msg, sizeof(msg)) < 0) {
-            fprintf(stderr, "write error\n");
-          }
+          writen(fd, msg, sizeof(msg));
+          // if (write(fd, msg, sizeof(msg)) < 0) {
+          //   fprintf(stderr, "write error\n");
+          // }
           i = i+2;
-          close(fd);
+          // close(fd);
         } else if (strcmp(argv[i],"get") == 0) {
           // printf("get\n");
           memset(msg, GET, 1);
           key = argv[i+1];
           strcpy(msg[1], key);
-          if (write(fd, msg, sizeof(msg)) < 0) {
-            fprintf(stderr, "write error\n");
-          }
+          writen(fd, msg, sizeof(msg));
+          // if (write(fd, msg, sizeof(msg)) < 0) {
+          //   fprintf(stderr, "write error\n");
+          // }
           if (read(fd, ans, sizeof(ans)) < 0) {
             fprintf(stderr, "read error\n");
             exit(EXIT_FAILURE);
