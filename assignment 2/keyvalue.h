@@ -14,4 +14,6 @@ char *get(char *key);
  */
 void put(char *key, char *value);
 
+void create(int size);
+
 #endif

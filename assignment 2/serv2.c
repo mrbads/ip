@@ -1,4 +1,4 @@
-// Iterative server
+// one-process-per-client server
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -9,7 +9,6 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#define _GNU_SOURCE
 #include <search.h>
 
 #include "keyvalue.h"
@@ -20,6 +19,11 @@ int FOUND = 102;
 int NOTFOUND = 110;
 int BACKLOG = 5;
 
+void sig_chld() {
+  while (waitpid(0, NULL, WNOHANG) > 0) {
+    signal(SIGCHLD, sig_chld);
+  }
+}
 
 int main(int argc, char const *argv[]) {
   int fd, newsock, res, option=1, port;
@@ -27,6 +31,7 @@ int main(int argc, char const *argv[]) {
   socklen_t addrlen;
   char msg[3][256], *p, *answer, terug[256];
   socklen_t fromlen = sizeof(client_addr);
+  pid_t pid;
   struct hsearch_data *hashtable;
 
   port = strtol(argv[1], NULL, 10);
@@ -47,11 +52,15 @@ int main(int argc, char const *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  create(64);
+  if (hcreate_r(64, hashtable) == 0) {
+    fprintf(stderr, "hcreate error\n");
+    exit(EXIT_FAILURE);
+  }
 
   printf("host: %s\n", inet_ntoa(addr.sin_addr));
 
   res = listen(fd, BACKLOG);
+  signal(SIGCHLD, sig_chld);
   while (1) {
     newsock = accept(fd, (struct sockaddr *) &client_addr, &addrlen);
 
@@ -59,38 +68,41 @@ int main(int argc, char const *argv[]) {
       fprintf(stderr, "accept error\n");
       exit(EXIT_FAILURE);
     } else {
-      printf("Connection from %s\n", inet_ntoa(client_addr.sin_addr));
-      printf("message: ");
-      if (read(newsock, msg, sizeof(msg)) < 0) {
-        fprintf(stderr, "read error\n");
-        exit(EXIT_FAILURE);
-      }
-      if (strcmp(msg[0],"p") == 0) {
-        printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
-        put(msg[1], msg[2]);
-      } else if (strcmp(msg[0], "g") == 0) {
-        printf("get\nkey: %s\n", msg[1]);
-        answer = get(msg[1]);
-        if ((strcmp(answer, "NULL")) != 0) {
-          printf("%s\n", answer);
-          memset(terug, FOUND, 1);
-          strcat(terug, answer);
-          printf("%s\n", terug);
-          if (write(newsock, terug, sizeof(terug)) < 0) {
-            fprintf(stderr, "write error\n");
-          }
-        } else {
-          memset(terug, NOTFOUND, 1);
-          printf("%s\n", terug);
-          if (write(newsock, terug, sizeof(terug)) < 0) {
-            fprintf(stderr, "write error\n");
-          }
+      pid = fork();
+      if (pid == 0) {
+        printf("Connection from %s\n", inet_ntoa(client_addr.sin_addr));
+        printf("message: ");
+        if (read(newsock, msg, sizeof(msg)) < 0) {
+          fprintf(stderr, "read error\n");
+          exit(EXIT_FAILURE);
         }
-        memset(terug, 0, sizeof(terug));
+        if (strcmp(msg[0],"p") == 0) {
+          printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
+          put(msg[1], msg[2]);
+        } else if (strcmp(msg[0], "g") == 0) {
+          printf("get\nkey: %s\n", msg[1]);
+          answer = get(msg[1]);
+          if ((strcmp(answer, "NULL")) != 0) {
+            printf("%s\n", answer);
+            memset(terug, FOUND, 1);
+            strcat(terug, answer);
+            printf("%s\n", terug);
+            if (write(newsock, terug, sizeof(terug)) < 0) {
+              fprintf(stderr, "write error\n");
+            }
+          } else {
+            memset(terug, NOTFOUND, 1);
+            printf("%s\n", terug);
+            if (write(newsock, terug, sizeof(terug)) < 0) {
+              fprintf(stderr, "write error\n");
+            }
+          }
+          memset(terug, 0, sizeof(terug));
+        }
+      } else {
+        close(newsock);
       }
-
     }
-    close(newsock);
   }
 
   close(fd);
