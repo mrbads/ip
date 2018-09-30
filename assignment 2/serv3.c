@@ -12,6 +12,7 @@
 #include <search.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include <wait.h>
 
 #include "keyvalue.h"
 
@@ -20,6 +21,12 @@ int PUT = 112;
 int FOUND = 102;
 int NOTFOUND = 110;
 int BACKLOG = 5;
+
+void sig_chld() {
+  while (waitpid(0, NULL, WNOHANG) > 0) {
+    signal(SIGCHLD, sig_chld);
+  }
+}
 
 void recv_requests(int fd, int my_sem) {
   // iterative server
@@ -41,11 +48,11 @@ void recv_requests(int fd, int my_sem) {
       exit(EXIT_FAILURE);
     } else {
       printf("Connection from %s\n", inet_ntoa(client_addr.sin_addr));
-      printf("message: ");
       if (read(newsock, msg, sizeof(msg)) < 0) {
         fprintf(stderr, "read error\n");
         exit(EXIT_FAILURE);
       }
+      printf("message: ");
       if (strcmp(msg[0],"p") == 0) {
         printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
         put(msg[1], msg[2]);
@@ -107,12 +114,11 @@ int main(int argc, char const *argv[]) {
   printf("host: %s\n", inet_ntoa(addr.sin_addr));
 
   listen(fd, BACKLOG);
+  signal(SIGCHLD, sig_chld);
 
-  while (1) {
-    for (size_t i = 0; i < NB_PROC; i++) {
-      if (fork() == 0) {
-        recv_requests(fd, my_sem);
-      }
+  for (size_t i = 0; i < NB_PROC; i++) {
+    if (fork() == 0) {
+      recv_requests(fd, my_sem);
     }
   }
 
