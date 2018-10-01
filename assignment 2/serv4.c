@@ -1,4 +1,4 @@
-// preforked server
+// one-process-per-client server
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -10,9 +10,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <search.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
 #include <wait.h>
+#include <pthread.h>
 
 #include "keyvalue.h"
 
@@ -22,34 +21,27 @@ int FOUND = 102;
 int NOTFOUND = 110;
 int BACKLOG = 5;
 
-static int my_sem;
+pthread_mutex_t mutex;
 
-void sig_chld() {
-  while (waitpid(0, NULL, WNOHANG) > 0) {
-    signal(SIGCHLD, sig_chld);
-  }
-}
-
-void recv_requests(int fd) {
+void *recv_requests(void *arg) {
   // iterative server
 
-  int newsock;
+  int newsock, *fd = (int *)arg;
   struct sockaddr_in client_addr;
   socklen_t addrlen;
-  char msg[3][256], terug[256], *answer, req_p[1], req_g[1];
-  struct sembuf up = {0, 1, 0};
-  struct sembuf down = {0, -1, 0};
+  char msg[3][256], req_p[1], req_g[1], *answer, terug[256];
 
+  printf("thread created\n");
   addrlen = sizeof(client_addr);
 
   while (1) {
-    semop(my_sem, &up, 1);
-    newsock = accept(fd, (struct sockaddr *) &client_addr, &addrlen);
+    pthread_mutex_lock(&mutex);
+    newsock = accept(*fd, (struct sockaddr *) &client_addr, &addrlen);
     if (newsock < 0) {
       fprintf(stderr, "accept error\n");
       exit(EXIT_FAILURE);
     }
-    semop(my_sem, &down, 1);
+    pthread_mutex_unlock(&mutex);
     printf("Connection from %s\n", inet_ntoa(client_addr.sin_addr));
 
     if (read(newsock, msg, sizeof(msg)) < 0) {
@@ -65,20 +57,14 @@ void recv_requests(int fd) {
     } else if (memcmp(msg[0], req_g, 1) == 0) {
       printf("get\nkey: %s\n", msg[1]);
       answer = get(msg[1]);
-      if ((strcmp(answer, "NULL")) != 0) {
+      if (strcmp(answer, "NULL") != 0) {
         printf("%s\n", answer);
         memset(terug, FOUND, 1);
         strcat(terug, answer);
         printf("%s\n", terug);
-        if (write(newsock, terug, sizeof(terug)) < 0) {
-          fprintf(stderr, "write error\n");
-        }
       } else {
         memset(terug, NOTFOUND, 1);
         printf("%s\n", terug);
-        if (write(newsock, terug, sizeof(terug)) < 0) {
-          fprintf(stderr, "write error\n");
-        }
       }
       bzero(terug, 256);
     }
@@ -87,17 +73,13 @@ void recv_requests(int fd) {
 }
 
 int main(int argc, char const *argv[]) {
-  int fd, option=1, port, NB_PROC;
+  int fd, option=1, port;
   struct sockaddr_in addr;
   socklen_t addrlen;
+  pthread_t *thread;
+  thread = (pthread_t *)malloc(2 * sizeof(pthread_t));
 
-  my_sem = semget(IPC_PRIVATE, 1, 0600);
-  if (my_sem == -1) {
-    fprintf(stderr, "semaphore error\n");
-    exit(EXIT_FAILURE);
-  }
   port = strtol(argv[1], NULL, 10);
-  NB_PROC = strtol(argv[2], NULL, 10);
   fd = socket(AF_INET, SOCK_STREAM, 0);
   addrlen = sizeof(struct sockaddr_in);
   memset(&addr, 0, addrlen);
@@ -120,16 +102,16 @@ int main(int argc, char const *argv[]) {
   printf("host: %s\n", inet_ntoa(addr.sin_addr));
 
   listen(fd, BACKLOG);
+  pthread_mutex_init(&mutex, NULL);
 
-  for (size_t i = 0; i < NB_PROC; i++) {
-    if (fork() == 0) {
-      recv_requests(fd);
-    } else {
-      // parent
-      signal(SIGCHLD, sig_chld);
+  for (size_t i = 0; i < 2; i++) {
+    if ((pthread_create(&thread[i], NULL, recv_requests, (void *)&fd)) != 0) {
+      fprintf(stderr, "thread create error\n");
+    }
+    if ((pthread_detach(thread[i])) != 0) {
+      fprintf(stderr, "thread detach error\n");
     }
   }
 
-  close(fd);
   return 0;
 }

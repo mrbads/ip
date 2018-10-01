@@ -9,7 +9,7 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 
-struct hsearch_data *hashtable;
+static struct hsearch_data *hashtable;
 
 struct store {
   char *value;
@@ -18,7 +18,7 @@ struct store {
 char *get(char *key) {
   ENTRY item;
   ENTRY *found_item;
-  char ret_msg[256], *answer;
+  char *answer;
 
   item.key = strdup(key);
   printf("%s\n", item.key);
@@ -42,15 +42,15 @@ void put(char *key, char *value) {
 
   my_sem = semget(IPC_PRIVATE, 1, 0600);
   store_ptr->value = strdup(value);
-  // printf("%s\n", store_ptr->value);
+  printf("%s\n", store_ptr->value);
   while (finished) {
     item.key = strdup(key);
+    semop(my_sem, &up, 1);
     item.data = store_ptr->value;
     store_ptr++;
-    semop(my_sem, &up, 1);
     hsearch_r(item, ENTER, &found_item, hashtable);
+    found_item->data = item.data;
     semop(my_sem, &down, 1);
-    // hsearch(item, ENTER);
     finished = 0;
     semctl(my_sem, 0, IPC_RMID);
     // printf("%s\n", item.data);

@@ -60,51 +60,47 @@ int main(int argc, char const *argv[]) {
   signal(SIGCHLD, sig_chld);
   while (1) {
     newsock = accept(fd, (struct sockaddr *) &client_addr, &addrlen);
-
     if (newsock < 0) {
       fprintf(stderr, "accept error\n");
       exit(EXIT_FAILURE);
-    } else {
-      pid = fork();
-      if (pid == 0) {
-        printf("Connection from %s\n", inet_ntoa(client_addr.sin_addr));
-        printf("message: ");
-        if (read(newsock, msg, sizeof(msg)) < 0) {
-          fprintf(stderr, "read error\n");
-          exit(EXIT_FAILURE);
-        }
-        memset(req_p, PUT, 1);
-        memset(req_g, GET, 1);
-        if (memcmp(msg[0], req_p, 1) == 0) {
-          printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
-          put(msg[1], msg[2]);
-        } else if (memcmp(msg[0], req_g, 1) == 0) {
-          printf("get\nkey: %s\n", msg[1]);
-          answer = get(msg[1]);
-          if ((strcmp(answer, "NULL")) != 0) {
-            printf("%s\n", answer);
-            memset(terug, FOUND, 1);
-            strcat(terug, answer);
-            printf("%s\n", terug);
-            if (write(newsock, terug, sizeof(terug)) < 0) {
-              fprintf(stderr, "write error\n");
-            }
-          } else {
-            memset(terug, NOTFOUND, 1);
-            printf("%s\n", terug);
-            if (write(newsock, terug, sizeof(terug)) < 0) {
-              fprintf(stderr, "write error\n");
-            }
-          }
-          memset(terug, 0, sizeof(terug));
-        }
-        printf("child done\n");
-      } else {
-        sleep(1);
-        answer = get(msg[1]);
-        printf("%s\n", answer);
-        close(newsock);
+    }
+
+    pid = fork();
+    if (pid == 0) {
+      printf("Connection from %s\n", inet_ntoa(client_addr.sin_addr));
+
+      if (read(newsock, msg, sizeof(msg)) < 0) {
+        fprintf(stderr, "read error\n");
+        exit(EXIT_FAILURE);
       }
+      memset(req_p, PUT, 1);
+      memset(req_g, GET, 1);
+      printf("message: ");
+      if (memcmp(msg[0], req_p, 1) == 0) {
+        printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
+        put(msg[1], msg[2]);
+      } else if (memcmp(msg[0], req_g, 1) == 0) {
+        printf("get\nkey: %s\n", msg[1]);
+        answer = get(msg[1]);
+        if ((strcmp(answer, "NULL")) != 0) {
+          printf("%s\n", answer);
+          memset(terug, FOUND, 1);
+          strcat(terug, answer);
+          printf("%s\n", terug);
+          if (write(newsock, terug, sizeof(terug)) < 0) {
+            fprintf(stderr, "write error\n");
+          }
+        } else {
+          memset(terug, NOTFOUND, 1);
+          if (write(newsock, terug, sizeof(terug)) < 0) {
+            fprintf(stderr, "write error\n");
+          }
+        }
+        bzero(terug, 256);
+      }
+      close(newsock);
+    } else {
+      // parent
     }
   }
 
