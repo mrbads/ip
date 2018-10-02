@@ -8,8 +8,11 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-static struct hsearch_data *hashtable;
+struct hsearch_data *hashtable;
 
 struct store {
   char *value;
@@ -25,6 +28,7 @@ char *get(char *key) {
   while (1) {
     hsearch_r(item, FIND, &found_item, hashtable);
     if (found_item != NULL) {
+      printf("%s\n", (char *)found_item->data);
       return ((char *)found_item->data);
     } else {
       return "NULL";

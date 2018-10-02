@@ -22,11 +22,14 @@ int NOTFOUND = 110;
 int BACKLOG = 5;
 
 pthread_mutex_t mutex;
+pthread_mutexattr_t attr;
+
+static int fd;
 
 void *recv_requests(void *arg) {
   // iterative server
 
-  int newsock, *fd = (int *)arg;
+  int newsock;
   struct sockaddr_in client_addr;
   socklen_t addrlen;
   char msg[3][256], req_p[1], req_g[1], *answer, terug[256];
@@ -36,17 +39,17 @@ void *recv_requests(void *arg) {
 
   while (1) {
     pthread_mutex_lock(&mutex);
-    newsock = accept(*fd, (struct sockaddr *) &client_addr, &addrlen);
+    newsock = accept(fd, (struct sockaddr *) &client_addr, &addrlen);
     if (newsock < 0) {
       fprintf(stderr, "accept error\n");
-      exit(EXIT_FAILURE);
+      // exit(EXIT_FAILURE);
     }
     pthread_mutex_unlock(&mutex);
     printf("Connection from %s\n", inet_ntoa(client_addr.sin_addr));
 
     if (read(newsock, msg, sizeof(msg)) < 0) {
       fprintf(stderr, "read error\n");
-      exit(EXIT_FAILURE);
+      // exit(EXIT_FAILURE);
     }
     memset(req_p, PUT, 1);
     memset(req_g, GET, 1);
@@ -62,9 +65,14 @@ void *recv_requests(void *arg) {
         memset(terug, FOUND, 1);
         strcat(terug, answer);
         printf("%s\n", terug);
+        if (write(newsock, terug, sizeof(terug)) < 0) {
+          fprintf(stderr, "write error\n");
+        }
       } else {
         memset(terug, NOTFOUND, 1);
-        printf("%s\n", terug);
+        if (write(newsock, terug, sizeof(terug)) < 0) {
+          fprintf(stderr, "write error\n");
+        }
       }
       bzero(terug, 256);
     }
@@ -73,11 +81,11 @@ void *recv_requests(void *arg) {
 }
 
 int main(int argc, char const *argv[]) {
-  int fd, option=1, port;
+  int option=1, port;
   struct sockaddr_in addr;
   socklen_t addrlen;
   pthread_t *thread;
-  thread = (pthread_t *)malloc(2 * sizeof(pthread_t));
+  thread = (pthread_t *)malloc(4 * sizeof(pthread_t));
 
   port = strtol(argv[1], NULL, 10);
   fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -102,15 +110,22 @@ int main(int argc, char const *argv[]) {
   printf("host: %s\n", inet_ntoa(addr.sin_addr));
 
   listen(fd, BACKLOG);
-  pthread_mutex_init(&mutex, NULL);
+  pthread_mutexattr_init(&attr);
+  if (pthread_mutex_init(&mutex, &attr) != 0) {
+    fprintf(stderr, "mutex init failed\n");
+  }
 
-  for (size_t i = 0; i < 2; i++) {
-    if ((pthread_create(&thread[i], NULL, recv_requests, (void *)&fd)) != 0) {
+  for (size_t i = 0; i < 4; i++) {
+    if ((pthread_create(&thread[i], NULL, &recv_requests, (void *)&fd)) != 0) {
       fprintf(stderr, "thread create error\n");
     }
     if ((pthread_detach(thread[i])) != 0) {
       fprintf(stderr, "thread detach error\n");
     }
+  }
+
+  while (1) {
+    /* code */
   }
 
   return 0;
