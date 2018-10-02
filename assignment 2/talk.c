@@ -5,17 +5,58 @@
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-int BACKLOG = 5;
+int fd_exit, BACKLOG = 5;
+char *kill_msg = "killquit";
+
+void close_prog(int sig) {
+  printf("end the convo\n");
+  write(fd_exit, kill_msg, sizeof(kill_msg -1));
+
+  exit(1);
+}
+
+void conversation(int fd) {
+  fd_set chatfds;
+  char msg[256], recv_msg[256];
+  int nb, recv;
+
+  fd_exit = fd;
+  signal(SIGINT, close_prog);
+  while (1) {
+    FD_ZERO(&chatfds);
+    FD_SET(fd, &chatfds);
+    FD_SET(0, &chatfds);
+    nb = select(20, &chatfds, NULL, NULL, NULL);
+    if (nb <= 0) {    }
+    if (FD_ISSET(fd, &chatfds)) {
+      recv = read(fd, recv_msg, sizeof(recv_msg));
+      if (strcmp(recv_msg, kill_msg) == 0) {
+        exit(1);
+      }
+      printf("%s\n", recv_msg);
+      FD_CLR(fd, &chatfds);
+    }
+    if (FD_ISSET(0, &chatfds)) {
+      fgets(msg, sizeof(msg), stdin);
+      write(fd, msg, sizeof(msg));
+      FD_CLR(0, &chatfds);
+    }
+  }
+}
 
 void server(const char *port) {
   int fd, option=1, newsock, port_s;
   struct sockaddr_in addr, client_addr;
   socklen_t addrlen;
+  char recv_msg[256];
+
+  printf("server mode\n");
 
   port_s = strtol(port, NULL, 10);
   fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -42,12 +83,18 @@ void server(const char *port) {
       exit(EXIT_FAILURE);
     }
     printf("Connection from %s\n", inet_ntoa(client_addr.sin_addr));
+
+    conversation(newsock);
   }
 }
 
 void client(const char *hostname, const char *port) {
   struct addrinfo hints, *result, *p;
-  int fd, status;
+  int fd, status, nb, recv;
+  char msg[256], recv_msg[256];
+  fd_set clientfds;
+
+  printf("client mode\n");
 
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
@@ -70,6 +117,7 @@ void client(const char *hostname, const char *port) {
       exit(EXIT_FAILURE);
     }
   }
+  conversation(fd);
 }
 
 int main(int argc, char const *argv[]) {
@@ -85,5 +133,6 @@ int main(int argc, char const *argv[]) {
     port = argv[2];
     client(hostname, port);
   }
+
   return 0;
 }
