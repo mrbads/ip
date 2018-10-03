@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <search.h>
+#include <errno.h>
 
 #include "keyvalue.h"
 

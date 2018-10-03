@@ -12,6 +12,7 @@
 #include <search.h>
 #include <wait.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include "keyvalue.h"
 

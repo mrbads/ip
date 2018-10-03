@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <search.h>
 #include <wait.h>
+#include <errno.h>
 
 #include "keyvalue.h"
 

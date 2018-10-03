@@ -13,6 +13,7 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <wait.h>
+#include <errno.h>
 
 #include "keyvalue.h"
 
