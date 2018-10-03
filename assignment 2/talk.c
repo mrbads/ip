@@ -16,7 +16,7 @@ int fd_exit, BACKLOG = 5;
 char *kill_msg = "killquit";
 
 void close_prog(int sig) {
-  printf("end the convo\n");
+  // printf("end the convo\n");
   write(fd_exit, kill_msg, sizeof(kill_msg -1));
 
   exit(1);
