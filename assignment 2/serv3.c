@@ -83,7 +83,9 @@ void recv_requests(int fd) {
     printf("message: ");
     if (memcmp(msg[0], req_p, 1) == 0) {
       printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
+      semop(my_sem, &up, 1);
       put(msg[1], msg[2]);
+      semop(my_sem, &down, 1);
     } else if (memcmp(msg[0], req_g, 1) == 0) {
       printf("get\nkey: %s\n", msg[1]);
       answer = get(msg[1]);
