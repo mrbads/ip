@@ -1,4 +1,4 @@
-// one-process-per-client server
+// multi-threaded server
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -21,10 +21,31 @@ int FOUND = 102;
 int NOTFOUND = 110;
 int BACKLOG = 5;
 
-pthread_mutex_t mutex;
+pthread_mutex_t mutex, put_mutex;
 pthread_mutexattr_t attr;
 
 static int fd;
+
+ssize_t writen(int fd, const char *vptr, size_t n) {
+  size_t nleft;
+  ssize_t nwritten;
+  const char *ptr;
+
+  ptr = vptr;
+  nleft = n;
+  while (nleft > 0) {
+    if ((nwritten = write(fd, ptr, nleft)) <= 0) {
+      if (errno == EINTR) {
+        nwritten = 0;
+      } else {
+        return -1;
+      }
+    }
+    nleft -= nwritten;
+    ptr += nwritten;
+  }
+  return n;
+}
 
 void *recv_requests(void *arg) {
   // iterative server
@@ -56,7 +77,9 @@ void *recv_requests(void *arg) {
     printf("message: ");
     if (memcmp(msg[0], req_p, 1) == 0) {
       printf("put\nkey: %s\nvalue: %s\n", msg[1], msg[2]);
+      pthread_mutex_lock(&put_mutex);
       put(msg[1], msg[2]);
+      pthread_mutex_unlock(&put_mutex);
     } else if (memcmp(msg[0], req_g, 1) == 0) {
       printf("get\nkey: %s\n", msg[1]);
       answer = get(msg[1]);
@@ -65,12 +88,12 @@ void *recv_requests(void *arg) {
         memset(terug, FOUND, 1);
         strcat(terug, answer);
         printf("%s\n", terug);
-        if (write(newsock, terug, sizeof(terug)) < 0) {
+        if (writen(newsock, terug, sizeof(terug)) < 0) {
           fprintf(stderr, "write error\n");
         }
       } else {
         memset(terug, NOTFOUND, 1);
-        if (write(newsock, terug, sizeof(terug)) < 0) {
+        if (writen(newsock, terug, sizeof(terug)) < 0) {
           fprintf(stderr, "write error\n");
         }
       }
@@ -113,6 +136,9 @@ int main(int argc, char const *argv[]) {
   pthread_mutexattr_init(&attr);
   if (pthread_mutex_init(&mutex, &attr) != 0) {
     fprintf(stderr, "mutex init failed\n");
+  }
+  if (pthread_mutex_init(&put_mutex, &attr) != 0) {
+    fprintf(stderr, "put_mutex init failed\n");
   }
 
   for (size_t i = 0; i < 4; i++) {

@@ -51,27 +51,27 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  for (p = result; p != NULL; p = p->ai_next) {
-    fd = socket(p->ai_family, p->ai_socktype, 0);
-    if (fd == -1) {
-      fprintf(stderr, "socket error\n");
-      exit(EXIT_FAILURE);
-    }
-    if (connect(fd, p->ai_addr, p->ai_addrlen) == -1) {
-    fprintf(stderr, "connect error\n");
-    exit(EXIT_FAILURE);
-    }
-    for (size_t i = 0; i < argc; i++) {
-      if (i < 3) {
-      } else {
-        if (strcmp(argv[i],"put") == 0) {
+
+  for (size_t i = 0; i < argc; i++) {
+    if (i < 3) {
+    } else {
+      for (p = result; p != NULL; p = p->ai_next) {
+        fd = socket(p->ai_family, p->ai_socktype, 0);
+        if (fd == -1) {
+          fprintf(stderr, "socket error\n");
+          exit(EXIT_FAILURE);
+        }
+        if (connect(fd, p->ai_addr, p->ai_addrlen) == -1) {
+        fprintf(stderr, "connect error\n");
+        exit(EXIT_FAILURE);
+        }        if (strcmp(argv[i],"put") == 0) {
           // printf("put\n");
           memset(msg, PUT, 1);
           key = argv[i+1];
           value = argv[i+2];
           strcpy(msg[1], key);
           strcpy(msg[2], value);
-          if (write(fd, msg, sizeof(msg)) < 0) {
+          if (writen(fd, msg, sizeof(msg)) < 0) {
             fprintf(stderr, "write error\n");
           }
           i = i+2;
@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
           memset(msg, GET, 1);
           key = argv[i+1];
           strcpy(msg[1], key);
-          if (write(fd, msg, sizeof(msg)) < 0) {
+          if (writen(fd, msg, sizeof(msg)) < 0) {
             fprintf(stderr, "write error\n");
           }
           if (read(fd, ans, sizeof(ans)) < 0) {
@@ -103,7 +103,6 @@ int main(int argc, char *argv[]) {
       }
     }
   }
-
 
   freeaddrinfo(result);
   return 0;

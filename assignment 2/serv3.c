@@ -30,6 +30,27 @@ void sig_chld() {
   }
 }
 
+ssize_t writen(int fd, const char *vptr, size_t n) {
+  size_t nleft;
+  ssize_t nwritten;
+  const char *ptr;
+
+  ptr = vptr;
+  nleft = n;
+  while (nleft > 0) {
+    if ((nwritten = write(fd, ptr, nleft)) <= 0) {
+      if (errno == EINTR) {
+        nwritten = 0;
+      } else {
+        return -1;
+      }
+    }
+    nleft -= nwritten;
+    ptr += nwritten;
+  }
+  return n;
+}
+
 void recv_requests(int fd) {
   // iterative server
 
@@ -70,13 +91,13 @@ void recv_requests(int fd) {
         memset(terug, FOUND, 1);
         strcat(terug, answer);
         printf("%s\n", terug);
-        if (write(newsock, terug, sizeof(terug)) < 0) {
+        if (writen(newsock, terug, sizeof(terug)) < 0) {
           fprintf(stderr, "write error\n");
         }
       } else {
         memset(terug, NOTFOUND, 1);
         printf("%s\n", terug);
-        if (write(newsock, terug, sizeof(terug)) < 0) {
+        if (writen(newsock, terug, sizeof(terug)) < 0) {
           fprintf(stderr, "write error\n");
         }
       }

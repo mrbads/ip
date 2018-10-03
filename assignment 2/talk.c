@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <signal.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -21,10 +22,31 @@ void close_prog(int sig) {
   exit(1);
 }
 
+ssize_t writen(int fd, const void *vptr, size_t n) {
+  size_t nleft;
+  ssize_t nwritten;
+  const char *ptr;
+
+  ptr = vptr;
+  nleft = n;
+  while (nleft > 0) {
+    if ((nwritten = write(fd, ptr, nleft)) <= 0) {
+      if (errno == EINTR) {
+        nwritten = 0;
+      } else {
+        return -1;
+      }
+    }
+    nleft -= nwritten;
+    ptr += nwritten;
+  }
+  return n;
+}
+
 void conversation(int fd) {
   fd_set chatfds;
   char msg[256], recv_msg[256];
-  int nb, recv;
+  int nb, recv, n;
 
   fd_exit = fd;
   signal(SIGINT, close_prog);
@@ -35,16 +57,19 @@ void conversation(int fd) {
     nb = select(20, &chatfds, NULL, NULL, NULL);
     if (nb <= 0) {    }
     if (FD_ISSET(fd, &chatfds)) {
+      bzero(recv_msg, 256);
       recv = read(fd, recv_msg, sizeof(recv_msg));
       if (strcmp(recv_msg, kill_msg) == 0) {
         exit(1);
       }
-      printf("%s\n", recv_msg);
+      printf("%s", recv_msg);
       FD_CLR(fd, &chatfds);
     }
     if (FD_ISSET(0, &chatfds)) {
       fgets(msg, sizeof(msg), stdin);
-      write(fd, msg, sizeof(msg));
+      if (writen(fd, msg, sizeof(msg)) < 0) {
+        fprintf(stderr, "write error\n");
+      }
       FD_CLR(0, &chatfds);
     }
   }
